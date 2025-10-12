@@ -1,71 +1,85 @@
-pipeline
-{
-  agent any
-  tools
-  {
-    maven "maven-3.9.6"
-  }
-  stages{
-    stage('Git Checkout')
+pipeline {
+    agent any
+    tools
     {
-      steps
-      {
-        git branch: 'development', url: 'https://github.com/sampletest1274/maven-webapplication-project-kkfunda.git'
-      }
+      maven "maven-3.9.6"
     }
-    stage('Maven Build')
-    {
-      steps
-      {
-        sh "mvn clean package"
-      }
-    }
-    stage("Sonar Qube")
-    {
-      steps
-      {
-        sh ' mvn sonar:sonar'
-      }
-    }
-    stage('upload in nexus')
-    {
-      steps
-      {
-        sh 'mvn deploy'
-      }
-    }
-    stage('Deploy into Tomcat')
-    {
-      steps
-      {
-        sh """
+     stages
+     {
+        stage('git checkout')
+        {
+          steps
+          {
+             notifyBuild('STARTED')
+             git branch: 'development', url: 'https://github.com/sampletest1274/maven-webapplication-project-kkfunda.git'
+          }
+        } //stage  close
+        stage('build')
+        {
+        steps
+        {
+           sh "mvn clean package"
+        }
+        }  //stage close
+        stage('SQ Report')
+        {
+           steps
+           {
+           sh "mvn sonar:sonar"
+           }
+        } //stage ending
+        stage('Uploadinto Nexus')
+        {
+           steps
+           {
+              sh "mvn deploy"
+           }
+        }  //stage ending
+
+        stage('tomcat deploy')
+        {
+        steps {
+                sh """
             curl -u kk:password \
             --upload-file /var/lib/jenkins/workspace/jio-declarative-pl/target/maven-web-application.war \
             "http://3.111.38.190:8080/manager/text/deploy?path=/maven-web-application&update=true"
         """
-      }
-    }
-  }
-  post {
+            }
+        }  //stage ending
+
+     }  // stages closing
+
+
+
+post {
   success {
-    Script
+
+    script
     {
-      notifybuild(currentBuild.result)
+     notifyBuild(currentBuild.result)
     }
+    
   }
   failure {
-    Script 
-    {
-      notifybuild(currentBuild.result)
-    }
+
+  script
+  {
+    notifyBuild(currentBuild.result)
+
+  }
+   
   }
 }
-}
+
+
+} // pipeline ending
+
+// Notification method
 def notifyBuild(String buildStatus = 'STARTED') {
     buildStatus = buildStatus ?: 'SUCCESS'
 
     def colorCode
-    def subject = "${buildStatus}: Job::::::: '${env.JOB_NAME} [${env.BUILD_NUMBER}]'"
+    def subject = "${buildStatus}: Job '${env.JOB_NAME} [${env.BUILD_NUMBER}]'"
     def summary = "${subject} (${env.BUILD_URL})"
 
     switch (buildStatus) {
